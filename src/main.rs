@@ -9,7 +9,7 @@ use axum::{
 };
 
 use shrink::shrinkers::Basic;
-use shrink::{generators::RB62, Shrinker};
+use shrink::{generators::RB62, storage::Sqlite, Shrinker};
 
 // which calls one of these handlers
 async fn root() -> &'static str {
@@ -18,7 +18,7 @@ async fn root() -> &'static str {
 
 #[derive(Clone)]
 struct AppState {
-    main: Arc<RwLock<Basic<RB62>>>,
+    main: Arc<RwLock<Basic<RB62, Sqlite>>>,
     scheme: &'static str,
     host: &'static str,
 }
@@ -53,7 +53,7 @@ async fn redirect(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::default();
+    let app = Basic::open("uris.db")?;
     let app = Arc::new(RwLock::new(app));
     let app = AppState {
         main: app,
