@@ -17,6 +17,7 @@ impl Basic<Counter, Memory> {
     pub fn from_file(path: &str) -> Result<Basic<Counter, Memory>, &'static str> {
         let f = std::fs::File::open(path).map_err(|_| "unable to open file")?;
         let reader = std::io::BufReader::new(f);
+
         let mut codes = Counter::default();
         let mut uris = Memory::default();
 
@@ -27,7 +28,7 @@ impl Basic<Counter, Memory> {
                 .map_err(|_| "invalid uri")?;
 
             let code = codes.generate(&uri)?;
-            uris.store(uri, code)?;
+            uris.store(uri, &code)?;
         }
 
         Ok(Self { uris, codes })
@@ -37,7 +38,7 @@ impl Basic<Counter, Memory> {
 impl Basic<RB62, Sqlite> {
     pub fn open(path: &str) -> Result<Basic<RB62, Sqlite>, &'static str> {
         Ok(Self {
-            uris: Sqlite::from_file(path)?,
+            uris: Sqlite::open(path)?,
             codes: RB62::default(),
         })
     }
@@ -46,7 +47,7 @@ impl Basic<RB62, Sqlite> {
 impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
     fn shrink(&mut self, uri: Uri) -> Result<String, &'static str> {
         let code = self.codes.generate(&uri)?;
-        self.uris.store(uri, code.clone())?;
+        self.uris.store(uri, &code)?;
 
         Ok(code)
     }
@@ -56,6 +57,6 @@ impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
     }
 
     fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), &'static str> {
-        self.uris.store(uri, code.clone())
+        self.uris.store(uri, &code)
     }
 }

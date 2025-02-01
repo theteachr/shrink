@@ -6,7 +6,7 @@ use crate::Storage;
 pub struct Sqlite(Pool<SqliteConnectionManager>);
 
 impl Sqlite {
-    pub fn from_file(path: &str) -> Result<Self, &'static str> {
+    pub fn open(path: &str) -> Result<Self, &'static str> {
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
 
@@ -34,11 +34,7 @@ impl Default for Sqlite {
 }
 
 impl Storage for Sqlite {
-    fn store(
-        &mut self,
-        uri: axum::http::Uri,
-        code: String,
-    ) -> std::result::Result<(), &'static str> {
+    fn store(&mut self, uri: axum::http::Uri, code: &str) -> std::result::Result<(), &'static str> {
         self.0
             .get()
             .map_err(|_| "failed to get a worker")?

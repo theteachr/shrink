@@ -17,6 +17,6 @@ trait Generator {
 }
 
 trait Storage {
-    fn store(&mut self, uri: Uri, code: String) -> Result<(), &'static str>;
+    fn store(&mut self, uri: Uri, code: &str) -> Result<(), &'static str>;
     fn load(&self, code: String) -> Result<Uri, &'static str>;
 }

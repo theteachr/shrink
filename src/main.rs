@@ -37,9 +37,7 @@ async fn custom_code(State(app): State<AppState>, body: String) -> Result<String
 
 async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
     let uri = body.parse().map_err(|_| "invalid uri")?;
-
-    // XXX: Inefficient.
-    // The lock holds the entire database.
+    // XXX: Maybe inefficient because locking the entire database.
     let code = app.main.write().await.shrink(uri)?;
 
     let shortened_uri = format!(
@@ -71,6 +69,7 @@ async fn redirect(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Basic::open("uris.db")?;
     let app = Arc::new(RwLock::new(app));
+
     let app = AppState {
         main: app,
         scheme: "http",

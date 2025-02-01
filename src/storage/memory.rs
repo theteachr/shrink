@@ -7,8 +7,8 @@ use crate::Storage;
 pub struct Memory(HashMap<String, Uri>);
 
 impl Storage for Memory {
-    fn store(&mut self, uri: Uri, code: String) -> Result<(), &'static str> {
-        self.0.insert(code, uri); // TODO: Handle when `code` is already present.
+    fn store(&mut self, uri: Uri, code: &str) -> Result<(), &'static str> {
+        self.0.insert(code.to_owned(), uri); // TODO: Handle when `code` is already present.
         Ok(())
     }
 
