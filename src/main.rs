@@ -20,6 +20,9 @@ struct AppState {
 
 async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
     let uri = body.parse().map_err(|_| "invalid uri")?;
+
+    // XXX: Inefficient.
+    // The lock holds the entire database.
     let code = app.main.write().unwrap().shrink(uri)?;
 
     let shortened_uri = format!(
@@ -43,6 +46,7 @@ async fn redirect(
         .expand(code)
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
+    // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
     Ok(Redirect::temporary(&uri.to_string()))
 }
 
