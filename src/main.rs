@@ -9,12 +9,12 @@ use axum::{
     Router,
 };
 
-use shrink::shrinkers::Basic;
-use shrink::{generators::RB62, storage::Sqlite, Shrinker};
+use shrink::{generators::RB62, Shrinker};
+use shrink::{shrinkers::Basic, storage::Postgres};
 
 #[derive(Clone)]
 struct AppState {
-    main: Arc<RwLock<Basic<RB62, Sqlite>>>,
+    main: Arc<RwLock<Basic<RB62, Postgres>>>,
     scheme: &'static str,
     host: &'static str,
 }
@@ -67,7 +67,7 @@ async fn redirect(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::open("uris.db")?;
+    let app = Basic::default();
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
