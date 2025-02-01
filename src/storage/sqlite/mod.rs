@@ -58,8 +58,6 @@ impl Storage for Sqlite {
             .prepare(include_str!("scripts/select.sql"))
             .map_err(|_| "failed to prepare statement")?;
 
-        dbg!(&stmt);
-
         let mut uris = stmt
             .query_map([code], |row| {
                 row.get::<usize, String>(0)?
