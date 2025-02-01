@@ -1,28 +1,35 @@
-use rusqlite::Connection;
+use r2d2::Pool;
+use r2d2_sqlite::SqliteConnectionManager;
 
 use crate::Storage;
 
-pub struct Sqlite(Connection);
+pub struct Sqlite(Pool<SqliteConnectionManager>);
 
 impl Sqlite {
     pub fn from_file(path: &str) -> Result<Self, &'static str> {
-        let conn = Connection::open(path).map_err(|_| "sqlite to always open")?;
+        let manager = SqliteConnectionManager::file(path);
+        let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
 
-        conn.execute(include_str!("scripts/schema.sql"), ())
+        pool.get()
+            .map_err(|_| "failed to get a worker")?
+            .execute(include_str!("scripts/schema.sql"), ())
             .expect("valid schema");
 
-        Ok(Self(conn))
+        Ok(Self(pool))
     }
 }
 
 impl Default for Sqlite {
     fn default() -> Self {
-        let conn = Connection::open_in_memory().expect("sqlite to always open in memory");
+        let manager = SqliteConnectionManager::memory();
+        let pool = Pool::new(manager).unwrap();
 
-        conn.execute(include_str!("scripts/schema.sql"), ())
+        pool.get()
+            .unwrap()
+            .execute(include_str!("scripts/schema.sql"), ())
             .expect("valid schema");
 
-        Self(conn)
+        Self(pool)
     }
 }
 
@@ -33,9 +40,11 @@ impl Storage for Sqlite {
         code: String,
     ) -> std::result::Result<(), &'static str> {
         self.0
+            .get()
+            .map_err(|_| "failed to get a worker")?
             .execute(
                 include_str!("scripts/insert.sql"),
-                (&uri.to_string(), &code),
+                (&code, &uri.to_string()),
             )
             .map_err(|_| "could not insert into sqlite")?;
 
@@ -43,10 +52,13 @@ impl Storage for Sqlite {
     }
 
     fn load(&self, code: String) -> std::result::Result<axum::http::Uri, &'static str> {
-        let mut stmt = self
-            .0
+        let conn = self.0.get().map_err(|_| "failed to get a worker")?;
+
+        let mut stmt = conn
             .prepare(include_str!("scripts/select.sql"))
             .map_err(|_| "failed to prepare statement")?;
+
+        dbg!(&stmt);
 
         let mut uris = stmt
             .query_map([code], |row| {
