@@ -1,4 +1,5 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use axum::{
     extract::{Path, State},
@@ -22,11 +23,7 @@ async fn custom_code(State(app): State<AppState>, body: String) -> Result<String
     let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
     let uri = uri.parse().map_err(|_| "invalid uri")?;
 
-    let _ = app
-        .main
-        .write()
-        .unwrap()
-        .store_custom(uri, code.to_string())?;
+    let _ = app.main.write().await.store_custom(uri, code.to_string())?;
 
     let shortened_uri = format!(
         "{scheme}://{host}/{code}\n",
@@ -43,7 +40,7 @@ async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'s
 
     // XXX: Inefficient.
     // The lock holds the entire database.
-    let code = app.main.write().unwrap().shrink(uri)?;
+    let code = app.main.write().await.shrink(uri)?;
 
     let shortened_uri = format!(
         "{scheme}://{host}/{code}\n",
@@ -62,7 +59,7 @@ async fn redirect(
     let uri = app
         .main
         .read()
-        .unwrap()
+        .await
         .expand(code)
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
