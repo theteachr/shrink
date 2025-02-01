@@ -2,19 +2,14 @@ use std::sync::{Arc, RwLock};
 
 use axum::{
     extract::{Path, State},
-    http::{StatusCode, Uri},
+    http::StatusCode,
     response::Redirect,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 
 use shrink::shrinkers::Basic;
 use shrink::{generators::RB62, storage::Sqlite, Shrinker};
-
-// which calls one of these handlers
-async fn root() -> &'static str {
-    "H"
-}
 
 #[derive(Clone)]
 struct AppState {
@@ -24,7 +19,7 @@ struct AppState {
 }
 
 async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
-    let uri = Uri::try_from(body).map_err(|_| "invalid uri")?;
+    let uri = body.parse().map_err(|_| "invalid uri")?;
     let code = app.main.write().unwrap().shrink(uri)?;
 
     let shortened_uri = format!(
@@ -62,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let router = Router::new()
-        .route("/", get(root).post(shrink))
+        .route("/", post(shrink))
         .route("/{code}", get(redirect))
         .with_state(app);
 
