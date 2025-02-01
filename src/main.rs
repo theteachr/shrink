@@ -7,7 +7,9 @@ use axum::{
     routing::get,
     Router,
 };
-use shrink::*;
+
+use shrink::shrinkers::Basic;
+use shrink::Shrinker;
 
 // which calls one of these handlers
 async fn root() -> &'static str {
@@ -29,14 +31,14 @@ async fn redirect(
         .read()
         .unwrap()
         .expand(code)
-        .map_err(|_: NotFound| StatusCode::NOT_FOUND)?;
+        .map_err(|_| StatusCode::NOT_FOUND)?;
 
     Ok(Redirect::temporary(&uri.to_string()))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::default();
+    let app = Basic::from_file("uris.txt")?;
     let app = Arc::new(RwLock::new(app));
 
     let router = Router::new()
