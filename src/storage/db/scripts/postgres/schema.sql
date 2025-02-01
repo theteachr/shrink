@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS uris (
+  code TEXT PRIMARY KEY,
+  uri TEXT NOT NULL
+);

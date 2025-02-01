@@ -12,7 +12,7 @@ impl Sqlite {
 
         pool.get()
             .map_err(|_| "failed to get a worker")?
-            .execute(include_str!("scripts/schema.sql"), ())
+            .execute(include_str!("scripts/sqlite/schema.sql"), ())
             .expect("valid schema");
 
         Ok(Self(pool))
@@ -26,7 +26,7 @@ impl Default for Sqlite {
 
         pool.get()
             .unwrap()
-            .execute(include_str!("scripts/schema.sql"), ())
+            .execute(include_str!("scripts/sqlite/schema.sql"), ())
             .expect("valid schema");
 
         Self(pool)
@@ -39,7 +39,7 @@ impl Storage for Sqlite {
             .get()
             .map_err(|_| "failed to get a worker")?
             .execute(
-                include_str!("scripts/insert.sql"),
+                include_str!("scripts/sqlite/insert.sql"),
                 (&code, &uri.to_string()),
             )
             .map_err(|_| "could not insert into sqlite")?;
@@ -51,7 +51,7 @@ impl Storage for Sqlite {
         let conn = self.0.get().map_err(|_| "failed to get a worker")?;
 
         let mut stmt = conn
-            .prepare(include_str!("scripts/select.sql"))
+            .prepare(include_str!("scripts/sqlite/select.sql"))
             .map_err(|_| "failed to prepare statement")?;
 
         let mut uris = stmt
