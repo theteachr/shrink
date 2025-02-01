@@ -18,6 +18,26 @@ struct AppState {
     host: &'static str,
 }
 
+async fn custom_code(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
+    let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
+    let uri = uri.parse().map_err(|_| "invalid uri")?;
+
+    let _ = app
+        .main
+        .write()
+        .unwrap()
+        .store_custom(uri, code.to_string())?;
+
+    let shortened_uri = format!(
+        "{scheme}://{host}/{code}\n",
+        scheme = app.scheme,
+        host = app.host,
+        code = code,
+    );
+
+    Ok(shortened_uri)
+}
+
 async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
     let uri = body.parse().map_err(|_| "invalid uri")?;
 
@@ -61,7 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let router = Router::new()
-        .route("/", post(shrink))
+        .route("/", post(shrink).put(custom_code))
         .route("/{code}", get(redirect))
         .with_state(app);
 

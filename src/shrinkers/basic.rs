@@ -54,4 +54,8 @@ impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
     fn expand(&self, code: String) -> Result<Uri, &'static str> {
         self.uris.load(code)
     }
+
+    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), &'static str> {
+        self.uris.store(uri, code.clone())
+    }
 }

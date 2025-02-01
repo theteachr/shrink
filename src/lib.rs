@@ -9,6 +9,7 @@ use axum::http::Uri;
 pub trait Shrinker {
     fn shrink(&mut self, uri: Uri) -> Result<String, &'static str>;
     fn expand(&self, code: String) -> Result<Uri, &'static str>;
+    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), &'static str>;
 }
 
 trait Generator {
