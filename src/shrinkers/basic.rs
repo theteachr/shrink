@@ -4,16 +4,16 @@ use crate::{generators::Counter, storage::Memory, Generator, Shrinker, Storage};
 use axum::http::Uri;
 
 #[derive(Default)]
-pub struct Basic {
+pub struct Basic<G> {
     uris: Memory,
-    counter: Counter,
+    codes: G,
 }
 
-impl Basic {
-    pub fn from_file(path: &str) -> Result<Self, &'static str> {
+impl Basic<Counter> {
+    pub fn from_file(path: &str) -> Result<Basic<Counter>, &'static str> {
         let f = std::fs::File::open(path).map_err(|_| "unable to open file")?;
         let reader = std::io::BufReader::new(f);
-        let mut counter = Counter::default();
+        let mut codes = Counter::default();
         let mut uris = Memory::default();
 
         for line in reader.lines() {
@@ -22,17 +22,17 @@ impl Basic {
                 .parse()
                 .map_err(|_| "invalid uri")?;
 
-            let code = counter.generate(&uri)?;
+            let code = codes.generate(&uri)?;
             uris.store(uri, code)?;
         }
 
-        Ok(Self { uris, counter })
+        Ok(Self { uris, codes })
     }
 }
 
-impl Shrinker for Basic {
+impl<G: Generator> Shrinker for Basic<G> {
     fn shrink(&mut self, uri: Uri) -> Result<String, &'static str> {
-        let code = self.counter.generate(&uri)?;
+        let code = self.codes.generate(&uri)?;
         self.uris.store(uri, code.clone())?;
 
         Ok(code)
