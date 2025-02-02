@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 
-use shrink::{generators::RB62, Shrinker};
+use shrink::{error::Storage, generators::RB62, Shrinker};
 use shrink::{shrinkers::Basic, storage::Postgres};
 
 #[derive(Clone)]
@@ -37,25 +37,54 @@ struct ShrinkResponse {
     shrunk: String,
 }
 
+#[derive(serde::Deserialize)]
+struct ShrinkRequest {
+    uri: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CustomShrinkRequest {
+    code: String,
+    uri: String,
+}
+
 async fn custom_code(
     State(app): State<AppState>,
-    body: String,
-) -> Result<Json<ShrinkResponse>, &'static str> {
-    let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
-    let uri = uri.parse().map_err(|_| "invalid uri")?;
+    body: Json<CustomShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
+    let uri = body
+        .uri
+        .parse()
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid uri"))?;
 
-    app.main.write().await.store_custom(uri, code.to_string())?;
+    app.main
+        .write()
+        .await
+        .store_custom(uri, body.code.clone())
+        .map_err(|e| match e {
+            Storage::Duplicate => (StatusCode::CONFLICT, "code already used"),
+            Storage::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+        })?;
 
-    Ok(Json(app.shrink_response(&code)))
+    Ok(Json(app.shrink_response(&body.code)))
 }
 
 async fn shrink(
     State(app): State<AppState>,
-    body: String,
-) -> Result<Json<ShrinkResponse>, &'static str> {
-    let uri = body.parse().map_err(|_| "invalid uri")?;
+    body: Json<ShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
+    let uri = body
+        .uri
+        .parse()
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid uri"))?;
+
     // XXX: Maybe inefficient because of locking the entire database?
-    let code = app.main.write().await.shrink(uri)?;
+    let code = app
+        .main
+        .write()
+        .await
+        .shrink(uri)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
 
     Ok(Json(app.shrink_response(&code)))
 }
@@ -63,13 +92,13 @@ async fn shrink(
 async fn redirect(
     State(app): State<AppState>,
     Path(code): Path<String>,
-) -> Result<Redirect, StatusCode> {
+) -> Result<Redirect, (StatusCode, &'static str)> {
     let uri = app
         .main
         .read()
         .await
         .expand(code)
-        .map_err(|_| StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::NOT_FOUND, "shrink code not found"))?;
 
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
     Ok(Redirect::temporary(&uri.to_string()))

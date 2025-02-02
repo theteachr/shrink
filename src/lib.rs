@@ -1,3 +1,4 @@
+pub mod error;
 pub mod generators;
 pub mod shrinkers;
 pub mod storage;
@@ -7,16 +8,16 @@ pub mod storage;
 use axum::http::Uri;
 
 pub trait Shrinker {
-    fn shrink(&mut self, uri: Uri) -> Result<String, &'static str>;
-    fn expand(&self, code: String) -> Result<Uri, &'static str>;
-    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), &'static str>;
+    fn shrink(&mut self, uri: Uri) -> Result<String, error::Internal>;
+    fn expand(&self, code: String) -> Result<Uri, error::Load>;
+    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), error::Storage>;
 }
 
 trait Generator {
-    fn generate(&mut self, uri: &Uri) -> Result<String, &'static str>;
+    fn generate(&mut self, uri: &Uri) -> String;
 }
 
 trait Storage {
-    fn store(&mut self, uri: Uri, code: &str) -> Result<(), &'static str>;
-    fn load(&self, code: String) -> Result<Uri, &'static str>;
+    fn store(&mut self, uri: Uri, code: &str) -> Result<(), error::Storage>;
+    fn load(&self, code: String) -> Result<Uri, error::Load>;
 }

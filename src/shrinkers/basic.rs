@@ -1,6 +1,7 @@
 use std::io::BufRead;
 
 use crate::{
+    error,
     generators::{Counter, RB62},
     storage::{Memory, Postgres, Sqlite},
     Generator, Shrinker, Storage,
@@ -14,7 +15,7 @@ pub struct Basic<G, S> {
 }
 
 impl Basic<Counter, Memory> {
-    pub fn from_file(path: &str) -> Result<Basic<Counter, Memory>, &'static str> {
+    pub fn from_file(path: &str) -> Result<Basic<Counter, Memory>, Box<dyn std::error::Error>> {
         let f = std::fs::File::open(path).map_err(|_| "unable to open file")?;
         let reader = std::io::BufReader::new(f);
 
@@ -27,7 +28,7 @@ impl Basic<Counter, Memory> {
                 .parse()
                 .map_err(|_| "invalid uri")?;
 
-            let code = codes.generate(&uri)?;
+            let code = codes.generate(&uri);
             uris.store(uri, &code)?;
         }
 
@@ -56,18 +57,18 @@ impl Basic<RB62, Postgres> {
 }
 
 impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
-    fn shrink(&mut self, uri: Uri) -> Result<String, &'static str> {
-        let code = self.codes.generate(&uri)?;
+    fn shrink(&mut self, uri: Uri) -> Result<String, error::Internal> {
+        let code = self.codes.generate(&uri);
         self.uris.store(uri, &code)?;
 
         Ok(code)
     }
 
-    fn expand(&self, code: String) -> Result<Uri, &'static str> {
+    fn expand(&self, code: String) -> Result<Uri, error::Load> {
         self.uris.load(code)
     }
 
-    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), &'static str> {
+    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), error::Storage> {
         self.uris.store(uri, &code)
     }
 }

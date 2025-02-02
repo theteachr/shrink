@@ -3,7 +3,7 @@ use r2d2::Pool;
 use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
 use tokio::task::block_in_place;
 
-use crate::Storage;
+use crate::{error, Storage};
 
 pub struct Postgres(Pool<PostgresConnectionManager<NoTls>>);
 
@@ -29,31 +29,35 @@ impl Postgres {
 }
 
 impl Storage for Postgres {
-    fn store(&mut self, uri: Uri, code: &str) -> std::result::Result<(), &'static str> {
+    fn store(&mut self, uri: Uri, code: &str) -> Result<(), error::Storage> {
         block_in_place(move || {
             self.0
                 .get()
-                .map_err(|_| "failed to get a worker")?
+                .map_err(|e| error::Storage::Internal(e.to_string()))?
                 .execute(
                     include_str!("scripts/postgres/insert.sql"),
                     &[&code, &uri.to_string()],
                 )
-                .map_err(|_| "could not insert into postgres")?;
+                // TODO: Check if it's a unique constraint violation
+                .map_err(|e| error::Storage::Internal(e.to_string()))?;
 
             Ok(())
         })
     }
 
-    fn load(&self, code: String) -> std::result::Result<Uri, &'static str> {
+    fn load(&self, code: String) -> Result<Uri, error::Load> {
         block_in_place(move || {
-            let mut conn = self.0.get().map_err(|_| "failed to get a worker")?;
+            let mut conn = self
+                .0
+                .get()
+                .map_err(|e| error::Load::Internal(e.to_string()))?;
 
             conn.query(include_str!("scripts/postgres/select.sql"), &[&code])
-                .map_err(|_| "failed to query postgres")?
+                .map_err(|e| error::Load::Internal(e.to_string()))? // TODO: Check for unique constraint violation
                 .iter()
                 .filter_map(|row| row.get::<usize, String>(0).parse::<Uri>().ok())
                 .next()
-                .ok_or("could not find uri")
+                .ok_or(error::Load::NotFound)
         })
     }
 }
