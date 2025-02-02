@@ -1,5 +1,6 @@
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::ErrorCode;
 use url::Url;
 
 use crate::{error, Storage};
@@ -43,7 +44,10 @@ impl Storage for Sqlite {
                 include_str!("scripts/sqlite/insert.sql"),
                 (&code, &url.to_string()),
             )
-            .map_err(|e| error::Storage::Internal(e.to_string()))?; // TODO: Check for whether the error is unique constraint violation
+            .map_err(|e| match e.sqlite_error().map(|e| e.code) {
+                Some(ErrorCode::ConstraintViolation) => error::Storage::Duplicate,
+                _ => error::Storage::Internal(e.to_string()),
+            })?;
 
         Ok(())
     }

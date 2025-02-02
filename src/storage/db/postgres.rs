@@ -1,5 +1,8 @@
 use r2d2::Pool;
-use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
+use r2d2_postgres::{
+    postgres::{error::SqlState, NoTls},
+    PostgresConnectionManager,
+};
 use tokio::task::block_in_place;
 use url::Url;
 
@@ -38,8 +41,10 @@ impl Storage for Postgres {
                     include_str!("scripts/postgres/insert.sql"),
                     &[&code, &url.to_string()],
                 )
-                // TODO: Check if it's a unique constraint violation
-                .map_err(|e| error::Storage::Internal(e.to_string()))?;
+                .map_err(|e| match e.code().cloned() {
+                    Some(SqlState::UNIQUE_VIOLATION) => error::Storage::Duplicate,
+                    _ => error::Storage::Internal(e.to_string()),
+                })?;
 
             Ok(())
         })
@@ -53,7 +58,7 @@ impl Storage for Postgres {
                 .map_err(|e| error::Load::Internal(e.to_string()))?;
 
             conn.query(include_str!("scripts/postgres/select.sql"), &[&code])
-                .map_err(|e| error::Load::Internal(e.to_string()))? // TODO: Check for unique constraint violation
+                .map_err(|e| error::Load::Internal(e.to_string()))?
                 .iter()
                 .filter_map(|row| row.get::<usize, String>(0).parse::<Url>().ok())
                 .next()

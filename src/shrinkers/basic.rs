@@ -16,18 +16,14 @@ pub struct Basic<G, S> {
 
 impl Basic<Counter, Memory> {
     pub fn from_file(path: &str) -> Result<Basic<Counter, Memory>, Box<dyn std::error::Error>> {
-        let f = std::fs::File::open(path).map_err(|_| "unable to open file")?;
+        let f = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(f);
 
         let mut codes = Counter::default();
         let mut urls = Memory::default();
 
         for line in reader.lines() {
-            let url = line
-                .map_err(|_| "unable to read line")?
-                .parse()
-                .map_err(|_| "invalid url")?;
-
+            let url = line?.parse()?;
             let code = codes.generate(&url);
             urls.store(url, &code)?;
         }
@@ -58,9 +54,12 @@ impl Basic<RB62, Postgres> {
 
 impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
     fn shrink(&mut self, url: Url) -> Result<String, error::Internal> {
-        let code = self.codes.generate(&url);
+        let mut code = self.codes.generate(&url);
+        // In case there is a collision, generate a new code until it's unique.
+        while let Ok(_) = self.urls.load(&code) {
+            code = self.codes.generate(&url);
+        }
         self.urls.store(url, &code)?;
-
         Ok(code)
     }
 
