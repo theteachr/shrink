@@ -1,5 +1,6 @@
+mod db;
 mod memory;
-mod sqlite;
 
+pub use db::postgres::Postgres;
+pub use db::sqlite::Sqlite;
 pub use memory::Memory;
-pub use sqlite::Sqlite;

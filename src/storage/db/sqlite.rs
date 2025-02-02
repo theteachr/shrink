@@ -6,13 +6,13 @@ use crate::Storage;
 pub struct Sqlite(Pool<SqliteConnectionManager>);
 
 impl Sqlite {
-    pub fn from_file(path: &str) -> Result<Self, &'static str> {
+    pub fn open(path: &str) -> Result<Self, &'static str> {
         let manager = SqliteConnectionManager::file(path);
         let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
 
         pool.get()
             .map_err(|_| "failed to get a worker")?
-            .execute(include_str!("scripts/schema.sql"), ())
+            .execute(include_str!("scripts/sqlite/schema.sql"), ())
             .expect("valid schema");
 
         Ok(Self(pool))
@@ -26,7 +26,7 @@ impl Default for Sqlite {
 
         pool.get()
             .unwrap()
-            .execute(include_str!("scripts/schema.sql"), ())
+            .execute(include_str!("scripts/sqlite/schema.sql"), ())
             .expect("valid schema");
 
         Self(pool)
@@ -34,16 +34,12 @@ impl Default for Sqlite {
 }
 
 impl Storage for Sqlite {
-    fn store(
-        &mut self,
-        uri: axum::http::Uri,
-        code: String,
-    ) -> std::result::Result<(), &'static str> {
+    fn store(&mut self, uri: axum::http::Uri, code: &str) -> std::result::Result<(), &'static str> {
         self.0
             .get()
             .map_err(|_| "failed to get a worker")?
             .execute(
-                include_str!("scripts/insert.sql"),
+                include_str!("scripts/sqlite/insert.sql"),
                 (&code, &uri.to_string()),
             )
             .map_err(|_| "could not insert into sqlite")?;
@@ -55,7 +51,7 @@ impl Storage for Sqlite {
         let conn = self.0.get().map_err(|_| "failed to get a worker")?;
 
         let mut stmt = conn
-            .prepare(include_str!("scripts/select.sql"))
+            .prepare(include_str!("scripts/sqlite/select.sql"))
             .map_err(|_| "failed to prepare statement")?;
 
         let mut uris = stmt

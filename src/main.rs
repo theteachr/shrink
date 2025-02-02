@@ -1,4 +1,5 @@
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use axum::{
     extract::{Path, State},
@@ -8,12 +9,12 @@ use axum::{
     Router,
 };
 
-use shrink::shrinkers::Basic;
-use shrink::{generators::RB62, storage::Sqlite, Shrinker};
+use shrink::{generators::RB62, Shrinker};
+use shrink::{shrinkers::Basic, storage::Postgres};
 
 #[derive(Clone)]
 struct AppState {
-    main: Arc<RwLock<Basic<RB62, Sqlite>>>,
+    main: Arc<RwLock<Basic<RB62, Postgres>>>,
     scheme: &'static str,
     host: &'static str,
 }
@@ -22,11 +23,7 @@ async fn custom_code(State(app): State<AppState>, body: String) -> Result<String
     let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
     let uri = uri.parse().map_err(|_| "invalid uri")?;
 
-    let _ = app
-        .main
-        .write()
-        .unwrap()
-        .store_custom(uri, code.to_string())?;
+    let _ = app.main.write().await.store_custom(uri, code.to_string())?;
 
     let shortened_uri = format!(
         "{scheme}://{host}/{code}\n",
@@ -40,10 +37,8 @@ async fn custom_code(State(app): State<AppState>, body: String) -> Result<String
 
 async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
     let uri = body.parse().map_err(|_| "invalid uri")?;
-
-    // XXX: Inefficient.
-    // The lock holds the entire database.
-    let code = app.main.write().unwrap().shrink(uri)?;
+    // XXX: Maybe inefficient because locking the entire database.
+    let code = app.main.write().await.shrink(uri)?;
 
     let shortened_uri = format!(
         "{scheme}://{host}/{code}\n",
@@ -62,7 +57,7 @@ async fn redirect(
     let uri = app
         .main
         .read()
-        .unwrap()
+        .await
         .expand(code)
         .map_err(|_| StatusCode::NOT_FOUND)?;
 
@@ -72,8 +67,9 @@ async fn redirect(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::open("uris.db")?;
+    let app = Basic::new().await;
     let app = Arc::new(RwLock::new(app));
+
     let app = AppState {
         main: app,
         scheme: "http",
