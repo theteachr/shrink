@@ -1,6 +1,7 @@
 use axum::http::Uri;
 use r2d2::Pool;
 use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
+use tokio::task::block_in_place;
 
 use crate::Storage;
 
@@ -10,25 +11,26 @@ impl Postgres {
     pub async fn connect(config: &str) -> Result<Self, &'static str> {
         let config = config.parse().map_err(|_| "bad config")?;
 
-        Ok(Self(tokio::task::block_in_place(move || {
+        // NOTE: Forced to depend on `tokio::task::block_in_place`!
+        // The synchronous implementation of postgres client depends on `tokio`
+        // but all it does is some `block_on` wrapping on all calls.
+        block_in_place(move || {
             let manager = PostgresConnectionManager::new(config, NoTls);
-            let pool = Pool::new(manager)
-                .map_err(|_| "failed to create pool")
-                .unwrap();
+            let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
 
             pool.get()
-                .expect("failed to get a worker")
+                .map_err(|_| "failed to get a worker")?
                 .batch_execute(include_str!("scripts/postgres/schema.sql"))
-                .expect("valid schema");
+                .map_err(|_| "valid schema")?;
 
-            pool
-        })))
+            Ok(Self(pool))
+        })
     }
 }
 
 impl Storage for Postgres {
-    fn store(&mut self, uri: axum::http::Uri, code: &str) -> std::result::Result<(), &'static str> {
-        tokio::task::block_in_place(move || {
+    fn store(&mut self, uri: Uri, code: &str) -> std::result::Result<(), &'static str> {
+        block_in_place(move || {
             self.0
                 .get()
                 .map_err(|_| "failed to get a worker")?
@@ -36,14 +38,14 @@ impl Storage for Postgres {
                     include_str!("scripts/postgres/insert.sql"),
                     &[&code, &uri.to_string()],
                 )
-                .map_err(|_| "could not insert into sqlite")?;
+                .map_err(|_| "could not insert into postgres")?;
 
             Ok(())
         })
     }
 
-    fn load(&self, code: String) -> std::result::Result<axum::http::Uri, &'static str> {
-        tokio::task::block_in_place(move || {
+    fn load(&self, code: String) -> std::result::Result<Uri, &'static str> {
+        block_in_place(move || {
             let mut conn = self.0.get().map_err(|_| "failed to get a worker")?;
 
             conn.query(include_str!("scripts/postgres/select.sql"), &[&code])
