@@ -107,7 +107,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: Add a tracing layer.
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
-    axum::serve(listener, router).await?;
+
+    // More issues with sync postgres client being dependent on tokio.
+    // Couldn't gracefully shutdonwn.
+
+    //let signals = signal::ctrl_c();
+
+    axum::serve(listener, router)
+        //.with_graceful_shutdown(async move {
+        //    if let Err(e) = signals.await {
+        //        eprintln!("error during shutdown: {}", e);
+        //    }
+        //})
+        .await?;
 
     Ok(())
 }

@@ -5,6 +5,8 @@ pub mod storage;
 
 use url::Url;
 
+// NOTE: Maybe consider going all async?
+
 pub trait Shrinker {
     fn shrink(&mut self, url: Url) -> Result<String, error::Internal>;
     fn expand(&self, code: &str) -> Result<Url, error::Load>;
