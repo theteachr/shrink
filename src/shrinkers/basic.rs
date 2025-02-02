@@ -2,7 +2,7 @@ use std::io::BufRead;
 
 use crate::{
     generators::{Counter, RB62},
-    storage::{Memory, Sqlite},
+    storage::{Memory, Postgres, Sqlite},
     Generator, Shrinker, Storage,
 };
 use axum::http::Uri;
@@ -41,6 +41,17 @@ impl Basic<RB62, Sqlite> {
             uris: Sqlite::open(path)?,
             codes: RB62::default(),
         })
+    }
+}
+
+impl Basic<RB62, Postgres> {
+    pub async fn new() -> Self {
+        Self {
+            uris: Postgres::connect("host=localhost user=postgres password=secret")
+                .await
+                .unwrap(),
+            codes: RB62::default(),
+        }
     }
 }
 

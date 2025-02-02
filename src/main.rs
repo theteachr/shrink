@@ -67,7 +67,7 @@ async fn redirect(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::default();
+    let app = Basic::new().await;
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
