@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     response::Redirect,
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 
 use shrink::{generators::RB62, Shrinker};
@@ -19,35 +19,45 @@ struct AppState {
     host: &'static str,
 }
 
-async fn custom_code(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
+impl AppState {
+    fn shrink_response(&self, code: &str) -> ShrinkResponse {
+        ShrinkResponse {
+            shrunk: format!(
+                "{scheme}://{host}/{code}",
+                scheme = self.scheme,
+                host = self.host,
+                code = code,
+            ),
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+struct ShrinkResponse {
+    shrunk: String,
+}
+
+async fn custom_code(
+    State(app): State<AppState>,
+    body: String,
+) -> Result<Json<ShrinkResponse>, &'static str> {
     let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
     let uri = uri.parse().map_err(|_| "invalid uri")?;
 
-    let _ = app.main.write().await.store_custom(uri, code.to_string())?;
+    app.main.write().await.store_custom(uri, code.to_string())?;
 
-    let shortened_uri = format!(
-        "{scheme}://{host}/{code}\n",
-        scheme = app.scheme,
-        host = app.host,
-        code = code,
-    );
-
-    Ok(shortened_uri)
+    Ok(Json(app.shrink_response(&code)))
 }
 
-async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
+async fn shrink(
+    State(app): State<AppState>,
+    body: String,
+) -> Result<Json<ShrinkResponse>, &'static str> {
     let uri = body.parse().map_err(|_| "invalid uri")?;
-    // XXX: Maybe inefficient because locking the entire database.
+    // XXX: Maybe inefficient because of locking the entire database?
     let code = app.main.write().await.shrink(uri)?;
 
-    let shortened_uri = format!(
-        "{scheme}://{host}/{code}\n",
-        scheme = app.scheme,
-        host = app.host,
-        code = code,
-    );
-
-    Ok(shortened_uri)
+    Ok(Json(app.shrink_response(&code)))
 }
 
 async fn redirect(
