@@ -64,11 +64,11 @@ impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
         Ok(code)
     }
 
-    fn expand(&self, code: String) -> Result<Url, error::Load> {
+    fn expand(&self, code: &str) -> Result<Url, error::Load> {
         self.urls.load(code)
     }
 
-    fn store_custom(&mut self, url: Url, code: String) -> Result<(), error::Storage> {
-        self.urls.store(url, &code)
+    fn store_custom(&mut self, url: Url, code: &str) -> Result<(), error::Storage> {
+        self.urls.store(url, code)
     }
 }
