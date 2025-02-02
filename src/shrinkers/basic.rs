@@ -6,11 +6,11 @@ use crate::{
     storage::{Memory, Postgres, Sqlite},
     Generator, Shrinker, Storage,
 };
-use axum::http::Uri;
+use url::Url;
 
 #[derive(Default)]
 pub struct Basic<G, S> {
-    uris: S,
+    urls: S,
     codes: G,
 }
 
@@ -20,26 +20,26 @@ impl Basic<Counter, Memory> {
         let reader = std::io::BufReader::new(f);
 
         let mut codes = Counter::default();
-        let mut uris = Memory::default();
+        let mut urls = Memory::default();
 
         for line in reader.lines() {
-            let uri = line
+            let url = line
                 .map_err(|_| "unable to read line")?
                 .parse()
-                .map_err(|_| "invalid uri")?;
+                .map_err(|_| "invalid url")?;
 
-            let code = codes.generate(&uri);
-            uris.store(uri, &code)?;
+            let code = codes.generate(&url);
+            urls.store(url, &code)?;
         }
 
-        Ok(Self { uris, codes })
+        Ok(Self { urls, codes })
     }
 }
 
 impl Basic<RB62, Sqlite> {
     pub fn open(path: &str) -> Result<Basic<RB62, Sqlite>, &'static str> {
         Ok(Self {
-            uris: Sqlite::open(path)?,
+            urls: Sqlite::open(path)?,
             codes: RB62::default(),
         })
     }
@@ -48,7 +48,7 @@ impl Basic<RB62, Sqlite> {
 impl Basic<RB62, Postgres> {
     pub async fn new() -> Self {
         Self {
-            uris: Postgres::connect("host=localhost user=postgres password=secret")
+            urls: Postgres::connect("host=localhost user=postgres password=secret")
                 .await
                 .unwrap(),
             codes: RB62::default(),
@@ -57,18 +57,18 @@ impl Basic<RB62, Postgres> {
 }
 
 impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
-    fn shrink(&mut self, uri: Uri) -> Result<String, error::Internal> {
-        let code = self.codes.generate(&uri);
-        self.uris.store(uri, &code)?;
+    fn shrink(&mut self, url: Url) -> Result<String, error::Internal> {
+        let code = self.codes.generate(&url);
+        self.urls.store(url, &code)?;
 
         Ok(code)
     }
 
-    fn expand(&self, code: String) -> Result<Uri, error::Load> {
-        self.uris.load(code)
+    fn expand(&self, code: String) -> Result<Url, error::Load> {
+        self.urls.load(code)
     }
 
-    fn store_custom(&mut self, uri: Uri, code: String) -> Result<(), error::Storage> {
-        self.uris.store(uri, &code)
+    fn store_custom(&mut self, url: Url, code: String) -> Result<(), error::Storage> {
+        self.urls.store(url, &code)
     }
 }
