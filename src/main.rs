@@ -34,28 +34,23 @@ struct ShrinkResponse {
 
 #[derive(serde::Deserialize)]
 struct ShrinkRequest {
-    url: Option<Url>,
+    url: Url,
 }
 
 #[derive(serde::Deserialize)]
 struct CustomShrinkRequest {
     code: String,
-    url: Option<Url>,
+    url: Url,
 }
 
 async fn custom_code(
     State(app): State<AppState>,
-    mut body: Json<CustomShrinkRequest>,
+    body: Json<CustomShrinkRequest>,
 ) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
-    let url = body
-        .url
-        .take()
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "url required"))?;
-
     app.main
         .write()
         .await
-        .store_custom(url, &body.code)
+        .store_custom(body.url.clone(), &body.code)
         .map_err(|e| match e {
             Storage::Duplicate => (StatusCode::CONFLICT, "code already used"),
             Storage::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
@@ -66,19 +61,14 @@ async fn custom_code(
 
 async fn shrink(
     State(app): State<AppState>,
-    mut body: Json<ShrinkRequest>,
+    body: Json<ShrinkRequest>,
 ) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
-    let url = body
-        .url
-        .take()
-        .ok_or_else(|| (StatusCode::BAD_REQUEST, "url required"))?;
-
     // XXX: Maybe inefficient because of locking the entire database?
     let code = app
         .main
         .write()
         .await
-        .shrink(url)
+        .shrink(body.url.clone())
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
 
     Ok(Json(app.shrink_response(&code)))
