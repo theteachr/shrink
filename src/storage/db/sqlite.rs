@@ -1,7 +1,8 @@
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
+use url::Url;
 
-use crate::Storage;
+use crate::{error, Storage};
 
 pub struct Sqlite(Pool<SqliteConnectionManager>);
 
@@ -34,36 +35,39 @@ impl Default for Sqlite {
 }
 
 impl Storage for Sqlite {
-    fn store(&mut self, uri: axum::http::Uri, code: &str) -> std::result::Result<(), &'static str> {
+    fn store(&mut self, url: Url, code: &str) -> Result<(), error::Storage> {
         self.0
             .get()
-            .map_err(|_| "failed to get a worker")?
+            .map_err(|e| error::Storage::Internal(e.to_string()))?
             .execute(
                 include_str!("scripts/sqlite/insert.sql"),
-                (&code, &uri.to_string()),
+                (&code, &url.to_string()),
             )
-            .map_err(|_| "could not insert into sqlite")?;
+            .map_err(|e| error::Storage::Internal(e.to_string()))?; // TODO: Check for whether the error is unique constraint violation
 
         Ok(())
     }
 
-    fn load(&self, code: String) -> std::result::Result<axum::http::Uri, &'static str> {
-        let conn = self.0.get().map_err(|_| "failed to get a worker")?;
+    fn load(&self, code: String) -> Result<Url, error::Load> {
+        let conn = self
+            .0
+            .get()
+            .map_err(|e| error::Load::Internal(e.to_string()))?; // FIXME
 
         let mut stmt = conn
             .prepare(include_str!("scripts/sqlite/select.sql"))
-            .map_err(|_| "failed to prepare statement")?;
+            .map_err(|e| error::Load::Internal(e.to_string()))?;
 
-        let mut uris = stmt
+        let mut urls = stmt
             .query_map([code], |row| {
                 row.get::<usize, String>(0)?
                     .parse()
                     .map_err(|_| rusqlite::Error::InvalidQuery)
             })
-            .map_err(|_| "failed to run select (sqlite)")?;
+            .map_err(|e| error::Load::Internal(e.to_string()))?;
 
-        uris.next()
-            .ok_or("no uri found")?
-            .map_err(|_| "failed to get uri")
+        urls.next()
+            .ok_or(error::Load::NotFound)?
+            .map_err(|e| error::Load::Internal(e.to_string()))
     }
 }

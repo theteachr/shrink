@@ -6,63 +6,87 @@ use axum::{
     http::StatusCode,
     response::Redirect,
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 
-use shrink::{generators::RB62, Shrinker};
+use shrink::{error::Storage, generators::RB62, Shrinker};
 use shrink::{shrinkers::Basic, storage::Postgres};
+use url::Url;
 
 #[derive(Clone)]
 struct AppState {
     main: Arc<RwLock<Basic<RB62, Postgres>>>,
-    scheme: &'static str,
-    host: &'static str,
+    base_url: Url,
 }
 
-async fn custom_code(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
-    let (code, uri) = body.split_once(' ').ok_or("invalid body")?;
-    let uri = uri.parse().map_err(|_| "invalid uri")?;
-
-    let _ = app.main.write().await.store_custom(uri, code.to_string())?;
-
-    let shortened_uri = format!(
-        "{scheme}://{host}/{code}\n",
-        scheme = app.scheme,
-        host = app.host,
-        code = code,
-    );
-
-    Ok(shortened_uri)
+impl AppState {
+    fn shrink_response(&self, code: &str) -> ShrinkResponse {
+        ShrinkResponse {
+            shrunk: self.base_url.join(code).unwrap(),
+        }
+    }
 }
 
-async fn shrink(State(app): State<AppState>, body: String) -> Result<String, &'static str> {
-    let uri = body.parse().map_err(|_| "invalid uri")?;
-    // XXX: Maybe inefficient because locking the entire database.
-    let code = app.main.write().await.shrink(uri)?;
+#[derive(serde::Serialize)]
+struct ShrinkResponse {
+    shrunk: Url,
+}
 
-    let shortened_uri = format!(
-        "{scheme}://{host}/{code}\n",
-        scheme = app.scheme,
-        host = app.host,
-        code = code,
-    );
+#[derive(serde::Deserialize)]
+struct ShrinkRequest {
+    url: Url,
+}
 
-    Ok(shortened_uri)
+#[derive(serde::Deserialize)]
+struct CustomShrinkRequest {
+    code: String,
+    url: Url,
+}
+
+async fn custom_code(
+    State(app): State<AppState>,
+    body: Json<CustomShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
+    app.main
+        .write()
+        .await
+        .store_custom(body.url.clone(), body.code.clone())
+        .map_err(|e| match e {
+            Storage::Duplicate => (StatusCode::CONFLICT, "code already used"),
+            Storage::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
+        })?;
+
+    Ok(Json(app.shrink_response(&body.code)))
+}
+
+async fn shrink(
+    State(app): State<AppState>,
+    body: Json<ShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
+    // XXX: Maybe inefficient because of locking the entire database?
+    let code = app
+        .main
+        .write()
+        .await
+        .shrink(body.url.clone())
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
+
+    Ok(Json(app.shrink_response(&code)))
 }
 
 async fn redirect(
     State(app): State<AppState>,
     Path(code): Path<String>,
-) -> Result<Redirect, StatusCode> {
-    let uri = app
+) -> Result<Redirect, (StatusCode, &'static str)> {
+    let url = app
         .main
         .read()
         .await
         .expand(code)
-        .map_err(|_| StatusCode::NOT_FOUND)?;
+        .map_err(|_| (StatusCode::NOT_FOUND, "shrink code not found"))?;
 
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
-    Ok(Redirect::temporary(&uri.to_string()))
+    Ok(Redirect::temporary(&url.to_string()))
 }
 
 #[tokio::main]
@@ -72,8 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = AppState {
         main: app,
-        scheme: "http",
-        host: "localhost:3000",
+        base_url: "http://localhost:3000".parse().unwrap(),
     };
 
     let router = Router::new()
