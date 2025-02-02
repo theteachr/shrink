@@ -1,5 +1,4 @@
 mod db;
-pub mod error;
 mod memory;
 
 pub use db::postgres::Postgres;

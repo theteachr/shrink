@@ -1,6 +1,9 @@
 use std::error::Error;
 use std::fmt::Display;
 
+use r2d2_postgres::postgres;
+use r2d2_sqlite::rusqlite;
+
 #[derive(Debug)]
 pub struct Duplicate;
 #[derive(Debug)]
@@ -67,6 +70,24 @@ impl From<Storage> for Internal {
         match err {
             Storage::Duplicate => Internal("duplicate entry".to_string()),
             Storage::Internal(msg) => Internal(msg),
+        }
+    }
+}
+
+impl From<postgres::Error> for Storage {
+    fn from(err: postgres::Error) -> Self {
+        match err.code().cloned() {
+            Some(postgres::error::SqlState::UNIQUE_VIOLATION) => Storage::Duplicate,
+            _ => Storage::Internal(err.to_string()),
+        }
+    }
+}
+
+impl From<rusqlite::Error> for Storage {
+    fn from(err: rusqlite::Error) -> Self {
+        match err.sqlite_error().map(|e| e.code) {
+            Some(rusqlite::ErrorCode::ConstraintViolation) => Storage::Duplicate,
+            _ => Storage::Internal(err.to_string()),
         }
     }
 }

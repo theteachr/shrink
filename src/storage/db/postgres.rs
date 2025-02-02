@@ -1,8 +1,5 @@
 use r2d2::Pool;
-use r2d2_postgres::{
-    postgres::{error::SqlState, NoTls},
-    PostgresConnectionManager,
-};
+use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
 use tokio::task::block_in_place;
 use url::Url;
 
@@ -40,11 +37,7 @@ impl Storage for Postgres {
                 .execute(
                     include_str!("scripts/postgres/insert.sql"),
                     &[&code, &url.to_string()],
-                )
-                .map_err(|e| match e.code().cloned() {
-                    Some(SqlState::UNIQUE_VIOLATION) => error::Storage::Duplicate,
-                    _ => error::Storage::Internal(e.to_string()),
-                })?;
+                )?;
 
             Ok(())
         })
