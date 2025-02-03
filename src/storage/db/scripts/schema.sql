@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS urls (
+  code TEXT PRIMARY KEY,
+  url TEXT NOT NULL
+);
