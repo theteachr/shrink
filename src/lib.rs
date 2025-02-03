@@ -17,7 +17,7 @@ trait Generator {
     fn generate(&mut self, url: &Url) -> String;
 }
 
-trait Storage {
+pub trait Storage {
     fn store(&mut self, url: Url, code: &str) -> Result<(), error::Storage>;
     fn load(&self, code: &str) -> Result<Url, error::Load>;
 }

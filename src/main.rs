@@ -11,7 +11,7 @@ use axum::{
 use shrink::{
     app::App,
     error::{Internal, Load},
-    storage::Postgres,
+    storage::{Cached, Redis, Sqlite},
 };
 
 use shrink::{error::Storage, generators::RB62, Shrinker};
@@ -47,8 +47,8 @@ async fn custom_code(
 
 #[derive(Clone)]
 struct AppState {
-    app: Arc<RwLock<App<RB62, Postgres>>>,
-    base_url: Url, // XXX: Arc this?
+    app: Arc<RwLock<App<RB62, Cached<Redis, Sqlite>>>>,
+    base_url: Url,
 }
 
 impl AppState {
@@ -77,7 +77,9 @@ struct CustomShrinkRequest {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = App::new().await;
+    let redis_client = Redis::default();
+
+    let app = App::open("urls.db")?.with_cache(redis_client);
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
