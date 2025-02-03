@@ -8,17 +8,25 @@ A URL Shortener built for [blazinglyfast.net](https://blazinglyfast.net/).
 
 ## Starting (URL Shortener) Shrink Server
 
-### Launch a Redis Instance
+### With Docker Compose
 
-Redis is used for caching. The current binary depends on Redis, although the program is customizable to opt out of cachine.
+```console
+docker-compose up
+```
 
-Install `redis-server` if not present and run it.
+### Locally
+
+#### Launch Redis Server
+
+> NOTE: The server is configured to use Redis for caching, although the program
+> is customizable to opt out of caching and not depend on Redis.
+> Please install `redis-server` if not present.
 
 ```console
 redis-server
 ```
 
-### Run the Rust Server Binary
+#### Run Rust Server Binary
 
 ```console
 cargo run --release
