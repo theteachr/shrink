@@ -11,7 +11,7 @@ use axum::{
 use shrink::{
     app::App,
     error::{Internal, Load},
-    storage::{Cached, Memory, Postgres},
+    storage::Postgres,
 };
 
 use shrink::{error::Storage, generators::RB62, Shrinker};
@@ -30,8 +30,7 @@ async fn redirect(
     State(state): State<AppState>,
     Path(code): Path<String>,
 ) -> Result<Redirect, Load> {
-    // Since a cache may store the URL on load, I'm forced to take a write lock.
-    let url = state.app.write().await.expand(&code)?;
+    let url = state.app.read().await.expand(&code)?;
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
     Ok(Redirect::temporary(url.as_str()))
 }
@@ -51,7 +50,7 @@ async fn custom_code(
 
 #[derive(Clone)]
 struct AppState {
-    app: Arc<RwLock<App<RB62, Cached<Memory, Postgres>>>>,
+    app: Arc<RwLock<App<RB62, Postgres>>>,
     base_url: Url,
 }
 
@@ -81,9 +80,7 @@ struct CustomShrinkRequest {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let memory = Memory::default();
-
-    let app = App::new().await.with_cache(memory);
+    let app = App::new().await;
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {

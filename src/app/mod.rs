@@ -4,7 +4,7 @@ use std::io::BufRead;
 use crate::{
     error,
     generators::{Counter, RB62},
-    storage::{Cached, Memory, Postgres, Sqlite},
+    storage::{Cache, Cached, Memory, Postgres, Sqlite},
     Generator, Shrinker, Storage,
 };
 use url::Url;
@@ -63,7 +63,7 @@ impl<G: Generator, S: Storage> Shrinker for App<G, S> {
         Ok(code)
     }
 
-    fn expand(&mut self, code: &str) -> Result<Url, error::Load> {
+    fn expand(&self, code: &str) -> Result<Url, error::Load> {
         self.urls.load(code)
     }
 
@@ -73,7 +73,7 @@ impl<G: Generator, S: Storage> Shrinker for App<G, S> {
 }
 
 impl<S: Storage, G> App<G, S> {
-    pub fn with_cache<C: Storage>(self, cache: C) -> App<G, Cached<C, S>> {
+    pub fn with_cache<C: Cache>(self, cache: C) -> App<G, Cached<C, S>> {
         App {
             urls: Cached {
                 cache,
