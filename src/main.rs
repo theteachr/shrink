@@ -11,7 +11,7 @@ use axum::{
 use shrink::{
     app::App,
     error::{Internal, Load},
-    storage::Postgres,
+    storage::{Cached, Memory, Postgres},
 };
 
 use shrink::{error::Storage, generators::RB62, Shrinker};
@@ -51,7 +51,7 @@ async fn custom_code(
 
 #[derive(Clone)]
 struct AppState {
-    app: Arc<RwLock<App<RB62, Postgres>>>,
+    app: Arc<RwLock<App<RB62, Cached<Memory, Postgres>>>>,
     base_url: Url,
 }
 
@@ -81,7 +81,9 @@ struct CustomShrinkRequest {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = App::new().await;
+    let memory = Memory::default();
+
+    let app = App::new().await.with_cache(memory);
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
