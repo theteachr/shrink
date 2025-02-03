@@ -82,10 +82,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::open("urls.db")?.with_cache(redis_client);
     let app = Arc::new(RwLock::new(app));
 
-    let app = AppState {
-        app,
-        base_url: "http://localhost:3000".parse().unwrap(),
-    };
+    let host = std::env::var("HOST").unwrap_or("localhost".to_owned());
+    let port = std::env::var("PORT").unwrap_or("3000".to_owned());
+    let scheme = "http";
+    let base_url = format!("{scheme}://{host}:{port}").parse().unwrap();
+
+    let app = AppState { app, base_url };
 
     let router = Router::new()
         .route("/", post(shrink).put(custom_code))
@@ -94,11 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Add a tracing layer.
 
-    let host = std::env::var("HOST").unwrap_or("localhost".to_owned());
-    let port = std::env::var("PORT").unwrap_or("3000".to_owned());
-    let addr = format!("{}:{}", host, port);
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     // More issues with sync postgres client being dependent on tokio.
     // Couldn't gracefully shutdonwn.
