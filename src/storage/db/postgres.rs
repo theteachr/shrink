@@ -43,7 +43,7 @@ impl Storage for Postgres {
         })
     }
 
-    fn load(&self, code: &str) -> Result<Url, error::Load> {
+    fn load(&mut self, code: &str) -> Result<Url, error::Load> {
         block_in_place(move || {
             let mut conn = self
                 .0

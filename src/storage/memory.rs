@@ -14,7 +14,7 @@ impl Storage for Memory {
         }
     }
 
-    fn load(&self, code: &str) -> Result<Url, error::Load> {
+    fn load(&mut self, code: &str) -> Result<Url, error::Load> {
         self.0.get(code).cloned().ok_or(error::Load::NotFound)
     }
 }

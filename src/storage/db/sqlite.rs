@@ -47,7 +47,7 @@ impl Storage for Sqlite {
         Ok(())
     }
 
-    fn load(&self, code: &str) -> Result<Url, error::Load> {
+    fn load(&mut self, code: &str) -> Result<Url, error::Load> {
         let conn = self
             .0
             .get()
