@@ -9,7 +9,7 @@ pub struct Sqlite(Pool<SqliteConnectionManager>);
 
 impl Sqlite {
     fn with_pool(manager: SqliteConnectionManager) -> Result<Self, Box<dyn Error>> {
-        let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
+        let pool = Pool::new(manager)?;
 
         pool.get()?
             .execute(include_str!("scripts/schema.sql"), ())?;

@@ -1,0 +1,16 @@
+services:
+  redis:
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+
+  shrink:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+    volumes:
+      - ./data:/shrink/data
+    environment:
+      REDIS_URL: "redis://redis:6379"

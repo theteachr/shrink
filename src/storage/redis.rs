@@ -60,7 +60,8 @@ impl Storage for Redis {
 
 impl Default for Redis {
     fn default() -> Self {
-        let client = Client::open("redis://127.0.0.1/").expect("Invalid Redis URL");
+        let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1/".to_string());
+        let client = Client::open(url).expect("Invalid Redis URL");
 
         let pool = Pool::builder()
             .connection_timeout(Duration::from_secs(5))
