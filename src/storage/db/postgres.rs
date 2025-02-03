@@ -1,5 +1,8 @@
 use r2d2::Pool;
-use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
+use r2d2_postgres::{
+    postgres::{Config, NoTls},
+    PostgresConnectionManager,
+};
 use tokio::task::block_in_place;
 use url::Url;
 
@@ -8,20 +11,22 @@ use crate::{error, Storage};
 pub struct Postgres(Pool<PostgresConnectionManager<NoTls>>);
 
 impl Postgres {
-    pub async fn connect(config: &str) -> Result<Self, &'static str> {
-        let config = config.parse().map_err(|_| "bad config")?;
-
+    pub async fn connect(config: &str) -> Result<Self, Box<dyn std::error::Error>> {
         // NOTE: Forced to depend on `tokio::task::block_in_place`!
         // The synchronous implementation of postgres client depends on `tokio`
         // but all it does is some `block_on` wrapping on all calls.
         block_in_place(move || {
-            let manager = PostgresConnectionManager::new(config, NoTls);
-            let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
+            let config = config
+                .parse::<Config>()?
+                .dbname("hackathon_raptors")
+                .to_owned();
 
-            pool.get()
-                .map_err(|_| "failed to get a worker")?
-                .batch_execute(include_str!("scripts/postgres/schema.sql"))
-                .map_err(|_| "valid schema")?;
+            let manager = PostgresConnectionManager::new(config, NoTls);
+            // XXX: This may not fail on `connect`, but on read or write.
+            let pool = Pool::new(manager)?;
+
+            pool.get()?
+                .batch_execute(include_str!("scripts/schema.sql"))?;
 
             Ok(Self(pool))
         })

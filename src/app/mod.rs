@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::io::BufRead;
 
 use crate::{
@@ -14,7 +15,7 @@ pub struct App<G, S> {
 }
 
 impl App<Counter, Memory> {
-    pub fn from_file(path: &str) -> Result<App<Counter, Memory>, Box<dyn std::error::Error>> {
+    pub fn from_file(path: &str) -> Result<App<Counter, Memory>, Box<dyn Error>> {
         let f = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(f);
 
@@ -32,7 +33,7 @@ impl App<Counter, Memory> {
 }
 
 impl App<RB62, Sqlite> {
-    pub fn open(path: &str) -> Result<App<RB62, Sqlite>, &'static str> {
+    pub fn open(path: &str) -> Result<App<RB62, Sqlite>, Box<dyn Error>> {
         Ok(Self {
             urls: Sqlite::open(path)?,
             codes: RB62::default(),
@@ -42,10 +43,10 @@ impl App<RB62, Sqlite> {
 
 impl App<RB62, Postgres> {
     pub async fn new() -> Self {
+        let config = "host=localhost user=postgres password=secret";
+
         Self {
-            urls: Postgres::connect("host=localhost user=postgres password=secret")
-                .await
-                .unwrap(),
+            urls: Postgres::connect(config).await.unwrap(),
             codes: RB62::default(),
         }
     }

@@ -1,1 +1,1 @@
-SELECT uri FROM uris WHERE code = ?1;
+SELECT url FROM urls WHERE code = ?1;

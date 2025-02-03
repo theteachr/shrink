@@ -1,1 +1,1 @@
-INSERT INTO uris (code, uri) VALUES ($1, $2);
+INSERT INTO urls (code, url) VALUES ($1, $2);

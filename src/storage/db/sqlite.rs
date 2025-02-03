@@ -1,5 +1,6 @@
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
+use std::error::Error;
 use url::Url;
 
 use crate::{error, Storage};
@@ -7,30 +8,23 @@ use crate::{error, Storage};
 pub struct Sqlite(Pool<SqliteConnectionManager>);
 
 impl Sqlite {
-    pub fn open(path: &str) -> Result<Self, &'static str> {
-        let manager = SqliteConnectionManager::file(path);
+    fn with_pool(manager: SqliteConnectionManager) -> Result<Self, Box<dyn Error>> {
         let pool = Pool::new(manager).map_err(|_| "failed to create pool")?;
 
-        pool.get()
-            .map_err(|_| "failed to get a worker")?
-            .execute(include_str!("scripts/sqlite/schema.sql"), ())
-            .expect("valid schema");
+        pool.get()?
+            .execute(include_str!("scripts/schema.sql"), ())?;
 
         Ok(Self(pool))
+    }
+
+    pub fn open(path: &str) -> Result<Self, Box<dyn Error>> {
+        Self::with_pool(SqliteConnectionManager::file(path))
     }
 }
 
 impl Default for Sqlite {
     fn default() -> Self {
-        let manager = SqliteConnectionManager::memory();
-        let pool = Pool::new(manager).unwrap();
-
-        pool.get()
-            .unwrap()
-            .execute(include_str!("scripts/sqlite/schema.sql"), ())
-            .expect("valid schema");
-
-        Self(pool)
+        Self::with_pool(SqliteConnectionManager::memory()).expect("failed to create in-memory pool")
     }
 }
 
