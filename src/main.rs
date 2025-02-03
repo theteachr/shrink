@@ -21,8 +21,9 @@ async fn shrink(
     State(state): State<AppState>,
     body: Json<ShrinkRequest>,
 ) -> Result<Json<ShrinkResponse>, Internal> {
+    let ShrinkRequest { url } = body.0;
     // XXX: Maybe inefficient because of locking the entire database?
-    let code = state.app.write().await.shrink(body.url.clone())?;
+    let code = state.app.write().await.shrink(url)?;
     Ok(Json(state.shrink_response(&code)))
 }
 
@@ -39,13 +40,9 @@ async fn custom_code(
     State(state): State<AppState>,
     body: Json<CustomShrinkRequest>,
 ) -> Result<Json<ShrinkResponse>, Storage> {
-    state
-        .app
-        .write()
-        .await
-        .store_custom(body.url.clone(), &body.code)?;
-
-    Ok(Json(state.shrink_response(&body.code)))
+    let CustomShrinkRequest { url, code } = body.0;
+    state.app.write().await.store_custom(url, &code)?;
+    Ok(Json(state.shrink_response(&code)))
 }
 
 #[derive(Clone)]
