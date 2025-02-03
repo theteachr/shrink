@@ -79,7 +79,7 @@ struct CustomShrinkRequest {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let redis_client = Redis::default();
 
-    let app = App::open("urls.db")?.with_cache(redis_client);
+    let app = App::open("data/urls.db")?.with_cache(redis_client);
     let app = Arc::new(RwLock::new(app));
 
     let host = std::env::var("HOST").unwrap_or("localhost".to_owned());
