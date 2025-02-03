@@ -13,8 +13,40 @@ use shrink::{
     error::{Internal, Load},
     storage::Postgres,
 };
+
 use shrink::{error::Storage, generators::RB62, Shrinker};
 use url::Url;
+
+async fn shrink(
+    State(state): State<AppState>,
+    body: Json<ShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, Internal> {
+    // XXX: Maybe inefficient because of locking the entire database?
+    let code = state.app.write().await.shrink(body.url.clone())?;
+    Ok(Json(state.shrink_response(&code)))
+}
+
+async fn redirect(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<Redirect, Load> {
+    let url = state.app.read().await.expand(&code)?;
+    // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
+    Ok(Redirect::temporary(&url.to_string()))
+}
+
+async fn custom_code(
+    State(state): State<AppState>,
+    body: Json<CustomShrinkRequest>,
+) -> Result<Json<ShrinkResponse>, Storage> {
+    state
+        .app
+        .write()
+        .await
+        .store_custom(body.url.clone(), &body.code)?;
+
+    Ok(Json(state.shrink_response(&body.code)))
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -46,44 +78,13 @@ struct CustomShrinkRequest {
     url: Url,
 }
 
-async fn custom_code(
-    State(state): State<AppState>,
-    body: Json<CustomShrinkRequest>,
-) -> Result<Json<ShrinkResponse>, Storage> {
-    state
-        .app
-        .write()
-        .await
-        .store_custom(body.url.clone(), &body.code)?;
-
-    Ok(Json(state.shrink_response(&body.code)))
-}
-
-async fn shrink(
-    State(state): State<AppState>,
-    body: Json<ShrinkRequest>,
-) -> Result<Json<ShrinkResponse>, Internal> {
-    // XXX: Maybe inefficient because of locking the entire database?
-    let code = state.app.write().await.shrink(body.url.clone())?;
-    Ok(Json(state.shrink_response(&code)))
-}
-
-async fn redirect(
-    State(state): State<AppState>,
-    Path(code): Path<String>,
-) -> Result<Redirect, Load> {
-    let url = state.app.read().await.expand(&code)?;
-    // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
-    Ok(Redirect::temporary(&url.to_string()))
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new().await;
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
-        app: app,
+        app,
         base_url: "http://localhost:3000".parse().unwrap(),
     };
 
