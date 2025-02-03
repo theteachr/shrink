@@ -94,7 +94,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Add a tracing layer.
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    let host = std::env::var("HOST").unwrap_or("localhost".to_owned());
+    let port = std::env::var("PORT").unwrap_or("3000".to_owned());
+    let addr = format!("{}:{}", host, port);
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
 
     // More issues with sync postgres client being dependent on tokio.
     // Couldn't gracefully shutdonwn.
