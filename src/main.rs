@@ -32,7 +32,7 @@ async fn redirect(
 ) -> Result<Redirect, Load> {
     let url = state.app.read().await.expand(&code)?;
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
-    Ok(Redirect::temporary(&url.to_string()))
+    Ok(Redirect::temporary(url.as_str()))
 }
 
 async fn custom_code(
