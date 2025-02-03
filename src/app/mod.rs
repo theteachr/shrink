@@ -8,14 +8,13 @@ use crate::{
 };
 use url::Url;
 
-#[derive(Default)]
-pub struct Basic<G, S> {
+pub struct App<G, S> {
     urls: S,
     codes: G,
 }
 
-impl Basic<Counter, Memory> {
-    pub fn from_file(path: &str) -> Result<Basic<Counter, Memory>, Box<dyn std::error::Error>> {
+impl App<Counter, Memory> {
+    pub fn from_file(path: &str) -> Result<App<Counter, Memory>, Box<dyn std::error::Error>> {
         let f = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(f);
 
@@ -32,8 +31,8 @@ impl Basic<Counter, Memory> {
     }
 }
 
-impl Basic<RB62, Sqlite> {
-    pub fn open(path: &str) -> Result<Basic<RB62, Sqlite>, &'static str> {
+impl App<RB62, Sqlite> {
+    pub fn open(path: &str) -> Result<App<RB62, Sqlite>, &'static str> {
         Ok(Self {
             urls: Sqlite::open(path)?,
             codes: RB62::default(),
@@ -41,7 +40,7 @@ impl Basic<RB62, Sqlite> {
     }
 }
 
-impl Basic<RB62, Postgres> {
+impl App<RB62, Postgres> {
     pub async fn new() -> Self {
         Self {
             urls: Postgres::connect("host=localhost user=postgres password=secret")
@@ -52,7 +51,7 @@ impl Basic<RB62, Postgres> {
     }
 }
 
-impl<G: Generator, S: Storage> Shrinker for Basic<G, S> {
+impl<G: Generator, S: Storage> Shrinker for App<G, S> {
     fn shrink(&mut self, url: Url) -> Result<String, error::Internal> {
         let mut code = self.codes.generate(&url);
         // In case there is a collision, generate a new code until it's unique.

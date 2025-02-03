@@ -1,6 +1,6 @@
+pub mod app;
 pub mod error;
 pub mod generators;
-pub mod shrinkers;
 pub mod storage;
 
 use url::Url;

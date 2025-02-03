@@ -3,19 +3,22 @@ use tokio::sync::RwLock;
 
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     response::Redirect,
     routing::{get, post},
     Json, Router,
 };
 
+use shrink::{
+    app::App,
+    error::{Internal, Load},
+    storage::Postgres,
+};
 use shrink::{error::Storage, generators::RB62, Shrinker};
-use shrink::{shrinkers::Basic, storage::Postgres};
 use url::Url;
 
 #[derive(Clone)]
 struct AppState {
-    main: Arc<RwLock<Basic<RB62, Postgres>>>,
+    app: Arc<RwLock<App<RB62, Postgres>>>,
     base_url: Url,
 }
 
@@ -44,58 +47,43 @@ struct CustomShrinkRequest {
 }
 
 async fn custom_code(
-    State(app): State<AppState>,
+    State(state): State<AppState>,
     body: Json<CustomShrinkRequest>,
-) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
-    app.main
+) -> Result<Json<ShrinkResponse>, Storage> {
+    state
+        .app
         .write()
         .await
-        .store_custom(body.url.clone(), &body.code)
-        .map_err(|e| match e {
-            Storage::Duplicate => (StatusCode::CONFLICT, "code already used"),
-            Storage::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal error"),
-        })?;
+        .store_custom(body.url.clone(), &body.code)?;
 
-    Ok(Json(app.shrink_response(&body.code)))
+    Ok(Json(state.shrink_response(&body.code)))
 }
 
 async fn shrink(
-    State(app): State<AppState>,
+    State(state): State<AppState>,
     body: Json<ShrinkRequest>,
-) -> Result<Json<ShrinkResponse>, (StatusCode, &'static str)> {
+) -> Result<Json<ShrinkResponse>, Internal> {
     // XXX: Maybe inefficient because of locking the entire database?
-    let code = app
-        .main
-        .write()
-        .await
-        .shrink(body.url.clone())
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "internal error"))?;
-
-    Ok(Json(app.shrink_response(&code)))
+    let code = state.app.write().await.shrink(body.url.clone())?;
+    Ok(Json(state.shrink_response(&code)))
 }
 
 async fn redirect(
-    State(app): State<AppState>,
+    State(state): State<AppState>,
     Path(code): Path<String>,
-) -> Result<Redirect, (StatusCode, &'static str)> {
-    let url = app
-        .main
-        .read()
-        .await
-        .expand(&code)
-        .map_err(|_| (StatusCode::NOT_FOUND, "shrink code not found"))?;
-
+) -> Result<Redirect, Load> {
+    let url = state.app.read().await.expand(&code)?;
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
     Ok(Redirect::temporary(&url.to_string()))
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = Basic::new().await;
+    let app = App::new().await;
     let app = Arc::new(RwLock::new(app));
 
     let app = AppState {
-        main: app,
+        app: app,
         base_url: "http://localhost:3000".parse().unwrap(),
     };
 

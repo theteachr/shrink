@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::Display;
 
+use axum::response::IntoResponse;
 use r2d2_postgres::postgres;
 use r2d2_sqlite::rusqlite;
 
@@ -88,6 +89,45 @@ impl From<rusqlite::Error> for Storage {
         match err.sqlite_error().map(|e| e.code) {
             Some(rusqlite::ErrorCode::ConstraintViolation) => Storage::Duplicate,
             _ => Storage::Internal(err.to_string()),
+        }
+    }
+}
+
+impl IntoResponse for Storage {
+    fn into_response(self) -> axum::http::Response<axum::body::Body> {
+        match self {
+            Storage::Duplicate => axum::http::Response::builder()
+                .status(axum::http::StatusCode::CONFLICT)
+                .body("code already used".into())
+                .unwrap(),
+            Storage::Internal(_) => axum::http::Response::builder()
+                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body("internal error".into())
+                .unwrap(),
+        }
+    }
+}
+
+impl IntoResponse for Internal {
+    fn into_response(self) -> axum::http::Response<axum::body::Body> {
+        axum::http::Response::builder()
+            .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+            .body(self.0.into())
+            .unwrap()
+    }
+}
+
+impl IntoResponse for Load {
+    fn into_response(self) -> axum::http::Response<axum::body::Body> {
+        match self {
+            Load::NotFound => axum::http::Response::builder()
+                .status(axum::http::StatusCode::NOT_FOUND)
+                .body("shrunk code not found".into())
+                .unwrap(),
+            Load::Internal(_) => axum::http::Response::builder()
+                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body("internal error".into())
+                .unwrap(),
         }
     }
 }
