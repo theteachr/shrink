@@ -13,9 +13,14 @@ impl<C: Storage, S: Storage> Storage for Cached<C, S> {
     }
 
     fn load(&mut self, code: &str) -> Result<Url, error::Load> {
-        match self.cache.load(code) {
-            Ok(url) => Ok(url),
-            Err(_) => self.storage.load(code),
-        }
+        self.cache.load(code).or_else(|_| {
+            let url = self.storage.load(code)?;
+
+            if let Err(_) = self.cache.store(url.clone(), code) {
+                eprintln!("Failed to store URL in cache");
+            }
+
+            Ok(url)
+        })
     }
 }
