@@ -10,11 +10,12 @@ use axum::{
 
 use shrink::{
     app::App,
-    error::{Internal, Load},
+    error::{self, Internal, Load},
     storage::{Cached, Redis, Sqlite},
+    Slug, Storage, Validator,
 };
 
-use shrink::{error::Storage, generators::RB62, Shrinker};
+use shrink::{generators::RB62, Shrinker};
 use url::Url;
 
 async fn shrink(
@@ -23,38 +24,49 @@ async fn shrink(
 ) -> Result<Json<ShrinkResponse>, Internal> {
     let ShrinkRequest { url } = body.0;
     // XXX: Maybe inefficient because of locking the entire database?
-    let code = state.app.write().await.shrink(url)?;
-    Ok(Json(state.shrink_response(&code)))
+    let slug = state.app.write().await.shrink(url)?;
+    Ok(Json(state.shrink_response(&slug)))
 }
 
 async fn redirect(
     State(state): State<AppState>,
-    Path(code): Path<String>,
-) -> Result<Redirect, Load> {
-    let url = state.app.read().await.expand(&code)?;
+    Path(slug): Path<String>,
+) -> Result<Redirect, error::Load> {
+    // #wet
+    let slug = state.validator.validate(&slug).ok_or(Load::BadAlias)?;
+    let url = state.app.read().await.expand(&slug)?;
     // Consider using 302 (Status Found) instead of 307 (Status Temporary Redirect).
     Ok(Redirect::temporary(url.as_str()))
 }
 
-async fn custom_code(
+async fn custom_slug(
     State(state): State<AppState>,
     body: Json<CustomShrinkRequest>,
-) -> Result<Json<ShrinkResponse>, Storage> {
-    let CustomShrinkRequest { url, code } = body.0;
-    state.app.write().await.store_custom(url, &code)?;
-    Ok(Json(state.shrink_response(&code)))
+) -> Result<Json<ShrinkResponse>, error::Storage> {
+    let CustomShrinkRequest { url, alias: slug } = body.0;
+
+    // #wet
+    // XXX: Use a deserializer or middleware to DRY this up?
+    let slug = state
+        .validator
+        .validate(&slug)
+        .ok_or(error::Storage::BadAlias)?;
+
+    state.app.write().await.urls.store(url, &slug)?;
+    Ok(Json(state.shrink_response(&slug)))
 }
 
 #[derive(Clone)]
 struct AppState {
     app: Arc<RwLock<App<RB62, Cached<Redis, Sqlite>>>>,
     base_url: Url,
+    validator: Arc<Validator>,
 }
 
 impl AppState {
-    fn shrink_response(&self, code: &str) -> ShrinkResponse {
+    fn shrink_response(&self, slug: &Slug) -> ShrinkResponse {
         ShrinkResponse {
-            shrunk: self.base_url.join(code).unwrap(),
+            shrunk: self.base_url.join(slug.as_str()).unwrap(),
         }
     }
 }
@@ -71,7 +83,7 @@ struct ShrinkRequest {
 
 #[derive(serde::Deserialize)]
 struct CustomShrinkRequest {
-    code: String,
+    alias: String,
     url: Url,
 }
 
@@ -87,11 +99,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheme = "http";
     let base_url = format!("{scheme}://{host}:{port}").parse().unwrap();
 
-    let app = AppState { app, base_url };
+    let app = AppState {
+        app,
+        base_url,
+        validator: Arc::new(Validator::default()),
+    };
 
     let router = Router::new()
-        .route("/", post(shrink).put(custom_code))
-        .route("/{code}", get(redirect))
+        .route("/", post(shrink).put(custom_slug))
+        .route("/{slug}", get(redirect))
         .with_state(app);
 
     // TODO: Add a tracing layer.

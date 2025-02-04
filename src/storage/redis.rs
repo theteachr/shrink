@@ -3,7 +3,7 @@ use redis::{Client, Commands};
 use std::time::Duration;
 use url::Url;
 
-use crate::{error, Storage};
+use crate::{error, Slug, Storage};
 
 use super::Cache;
 
@@ -31,30 +31,30 @@ impl Redis {
 }
 
 impl Cache for Redis {
-    fn get(&self, code: &str) -> Result<Url, error::Load> {
-        self.get(code).map_err(|_| error::Load::NotFound)
+    fn get(&self, slug: &Slug) -> Result<Url, error::Load> {
+        self.get(slug.as_str()).map_err(|_| error::Load::NotFound)
     }
 
-    fn set(&self, url: &Url, code: &str) -> Result<(), error::Storage> {
-        self.set(code, url.as_str())
+    fn set(&self, url: &Url, slug: &Slug) -> Result<(), error::Storage> {
+        self.set(slug.as_str(), url.as_str())
             .map_err(|_| crate::error::Storage::Duplicate)
     }
 }
 
 impl Storage for Redis {
-    fn store(&mut self, url: Url, code: &str) -> Result<(), error::Storage> {
-        match self.get(code) {
+    fn store(&mut self, url: Url, slug: &Slug) -> Result<(), error::Storage> {
+        match self.get(slug.as_str()) {
             Ok(_) => Err(crate::error::Storage::Duplicate),
             Err(_) => {
-                self.set(code, url.as_str())
+                self.set(slug.as_str(), url.as_str())
                     .map_err(|e| error::Storage::Internal(e.to_string()))?;
                 Ok(())
             }
         }
     }
 
-    fn load(&self, code: &str) -> Result<Url, error::Load> {
-        self.get(code).map_err(|_| error::Load::NotFound)
+    fn load(&self, slug: &Slug) -> Result<Url, error::Load> {
+        self.get(slug.as_str()).map_err(|_| error::Load::NotFound)
     }
 }
 

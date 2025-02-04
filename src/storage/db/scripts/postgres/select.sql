@@ -1,1 +1,1 @@
-SELECT url FROM urls WHERE code = $1;
+SELECT url FROM urls WHERE slug = $1;

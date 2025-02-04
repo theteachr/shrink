@@ -1,1 +1,1 @@
-INSERT INTO `urls` (`code`, `url`) VALUES (?1, ?2);
+INSERT INTO `urls` (`slug`, `url`) VALUES (?1, ?2);
