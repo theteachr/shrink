@@ -82,12 +82,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::open("data/urls.db")?.with_cache(redis_client);
     let app = Arc::new(RwLock::new(app));
 
-    let host = std::env::var("HOST").unwrap_or("localhost".to_owned());
+    let server_url = std::env::var("SERVER_URL").unwrap_or("http://localhost:3000".to_owned());
     let port = std::env::var("PORT").unwrap_or("3000".to_owned());
-    let scheme = "http";
-    let base_url = format!("{scheme}://{host}:{port}").parse().unwrap();
 
-    let app = AppState { app, base_url };
+    let app = AppState {
+        app,
+        base_url: server_url.parse()?,
+    };
 
     let router = Router::new()
         .route("/", post(shrink).put(custom_code))
