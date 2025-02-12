@@ -1,10 +1,10 @@
 use url::Url;
 
-use crate::{error, Storage};
+use crate::{error, Slug, Storage};
 
 pub trait Cache: Storage {
-    fn get(&self, code: &str) -> Result<Url, error::Load>;
-    fn set(&self, url: &Url, code: &str) -> Result<(), error::Storage>;
+    fn get(&self, slug: &Slug) -> Result<Url, error::Load>;
+    fn set(&self, url: &Url, slug: &Slug) -> Result<(), error::Storage>;
 }
 
 pub struct Cached<C: Cache, S: Storage> {
@@ -13,15 +13,15 @@ pub struct Cached<C: Cache, S: Storage> {
 }
 
 impl<C: Cache, S: Storage> Storage for Cached<C, S> {
-    fn store(&mut self, url: Url, code: &str) -> Result<(), error::Storage> {
-        self.storage.store(url, code)
+    fn store(&mut self, url: Url, slug: &Slug) -> Result<(), error::Storage> {
+        self.storage.store(url, slug)
     }
 
-    fn load(&self, code: &str) -> Result<Url, error::Load> {
-        self.cache.load(code).or_else(|_| {
-            let url = self.storage.load(code)?;
+    fn load(&self, slug: &Slug) -> Result<Url, error::Load> {
+        self.cache.load(slug).or_else(|_| {
+            let url = self.storage.load(slug)?;
 
-            if let Err(_) = self.cache.set(&url, code) {
+            if let Err(_) = self.cache.set(&url, slug) {
                 eprintln!("Failed to store URL in cache");
             }
 

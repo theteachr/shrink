@@ -11,16 +11,20 @@ pub struct Duplicate;
 pub struct NotFound;
 #[derive(Debug)]
 pub struct Internal(String);
+#[derive(Debug)]
+pub struct BadAlias;
 
 #[derive(Debug)]
 pub enum Storage {
     Duplicate,
+    BadAlias,
     Internal(String),
 }
 
 #[derive(Debug)]
 pub enum Load {
     NotFound,
+    BadAlias,
     Internal(String),
 }
 
@@ -47,15 +51,19 @@ impl Display for Storage {
         match self {
             Storage::Duplicate => NotFound.fmt(f),
             Storage::Internal(msg) => write!(f, "internal storage error: {}", msg),
+            Storage::BadAlias => write!(f, "bad alias"),
         }
     }
 }
+
+// TODO: Remove duplication (bad alias, internal error)
 
 impl Display for Load {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Load::NotFound => NotFound.fmt(f),
             Load::Internal(msg) => write!(f, "internal load error: {}", msg),
+            Load::BadAlias => write!(f, "bad alias"),
         }
     }
 }
@@ -71,6 +79,7 @@ impl From<Storage> for Internal {
         match err {
             Storage::Duplicate => Internal("duplicate entry".to_string()),
             Storage::Internal(msg) => Internal(msg),
+            Storage::BadAlias => Internal("bad alias".to_string()),
         }
     }
 }
@@ -104,6 +113,10 @@ impl IntoResponse for Storage {
                 .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
                 .body("internal error".into())
                 .unwrap(),
+            Storage::BadAlias => axum::http::Response::builder()
+                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body("bad alias".into())
+                .unwrap(),
         }
     }
 }
@@ -127,6 +140,10 @@ impl IntoResponse for Load {
             Load::Internal(_) => axum::http::Response::builder()
                 .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
                 .body("internal error".into())
+                .unwrap(),
+            Load::BadAlias => axum::http::Response::builder()
+                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .body("bad alias".into())
                 .unwrap(),
         }
     }
