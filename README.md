@@ -11,7 +11,7 @@ A URL Shortener built for [blazinglyfast.net](https://blazinglyfast.net/).
 ### With Docker Compose
 
 ```console
-docker-compose up
+docker compose up
 ```
 
 ### Locally
