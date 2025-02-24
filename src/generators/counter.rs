@@ -1,11 +1,11 @@
-use crate::{Generator, Slug};
+use crate::{validator::Code, Generator};
 
 #[derive(Clone, Default)]
 pub struct Counter(usize); // XXX: This is not `Send` (I think).
 
 impl Generator for Counter {
-    fn generate(&mut self, _: &url::Url) -> Slug {
+    fn generate(&mut self, _: &url::Url) -> Code {
         self.0 += 1;
-        Slug::new(self.0.to_string())
+        Code::new(self.0.to_string())
     }
 }

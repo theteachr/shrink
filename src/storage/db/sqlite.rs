@@ -3,7 +3,7 @@ use r2d2_sqlite::SqliteConnectionManager;
 use std::error::Error;
 use url::Url;
 
-use crate::{error, Slug, Storage};
+use crate::{error, Code, Storage};
 
 pub struct Sqlite(Pool<SqliteConnectionManager>);
 
@@ -29,19 +29,19 @@ impl Default for Sqlite {
 }
 
 impl Storage for Sqlite {
-    fn store(&mut self, url: Url, slug: &Slug) -> Result<(), error::Storage> {
+    fn store(&mut self, url: Url, code: &Code) -> Result<(), error::Storage> {
         self.0
             .get()
             .map_err(|e| error::Storage::Internal(e.to_string()))?
             .execute(
                 include_str!("scripts/sqlite/insert.sql"),
-                (slug.as_str(), url.as_str()),
+                (code.as_str(), url.as_str()),
             )?;
 
         Ok(())
     }
 
-    fn load(&self, slug: &Slug) -> Result<Url, error::Load> {
+    fn load(&self, code: &Code) -> Result<Url, error::Load> {
         let conn = self
             .0
             .get()
@@ -52,7 +52,7 @@ impl Storage for Sqlite {
             .map_err(|e| error::Load::Internal(e.to_string()))?;
 
         let mut urls = stmt
-            .query_map([slug.as_str()], |row| {
+            .query_map([code.as_str()], |row| {
                 row.get::<usize, String>(0)?
                     .parse()
                     .map_err(|_| rusqlite::Error::InvalidQuery)

@@ -5,13 +5,14 @@ use crate::{
     error,
     generators::{Counter, RB62},
     storage::{Cache, Cached, Memory, Postgres, Sqlite},
-    Generator, Shrinker, Slug, Storage,
+    validator::Code,
+    Generator, Shrinker, Storage,
 };
 use url::Url;
 
 pub struct App<G, S> {
     pub urls: S,
-    slugs: G,
+    codes: G,
 }
 
 impl App<Counter, Memory> {
@@ -19,16 +20,16 @@ impl App<Counter, Memory> {
         let f = std::fs::File::open(path)?;
         let reader = std::io::BufReader::new(f);
 
-        let mut slugs = Counter::default();
+        let mut codes = Counter::default();
         let mut urls = Memory::default();
 
         for line in reader.lines() {
             let url = line?.parse()?;
-            let slug = slugs.generate(&url);
-            urls.store(url, &slug)?;
+            let code = codes.generate(&url);
+            urls.store(url, &code)?;
         }
 
-        Ok(Self { urls, slugs })
+        Ok(Self { urls, codes })
     }
 }
 
@@ -36,7 +37,7 @@ impl App<RB62, Sqlite> {
     pub fn open(path: &str) -> Result<App<RB62, Sqlite>, Box<dyn Error>> {
         Ok(Self {
             urls: Sqlite::open(path)?,
-            slugs: RB62::default(),
+            codes: RB62::default(),
         })
     }
 }
@@ -47,24 +48,24 @@ impl App<RB62, Postgres> {
 
         Self {
             urls: Postgres::connect(config).await.unwrap(),
-            slugs: RB62::default(),
+            codes: RB62::default(),
         }
     }
 }
 
 impl<G: Generator, S: Storage> Shrinker for App<G, S> {
-    fn shrink(&mut self, url: Url) -> Result<Slug, error::Internal> {
-        let mut slug = self.slugs.generate(&url);
-        // In case there is a collision, generate a new slug until it's unique.
-        while let Ok(_) = self.urls.load(&slug) {
-            slug = self.slugs.generate(&url);
+    fn shrink(&mut self, url: Url) -> Result<Code, error::Internal> {
+        let mut code = self.codes.generate(&url);
+        // In case there is a collision, generate a new code until it's unique.
+        while let Ok(_) = self.urls.load(&code) {
+            code = self.codes.generate(&url);
         }
-        self.urls.store(url, &slug)?;
-        Ok(slug)
+        self.urls.store(url, &code)?;
+        Ok(code)
     }
 
-    fn expand(&self, slug: &Slug) -> Result<Url, error::Load> {
-        self.urls.load(slug)
+    fn expand(&self, code: &Code) -> Result<Url, error::Load> {
+        self.urls.load(code)
     }
 }
 
@@ -75,7 +76,7 @@ impl<S: Storage, G> App<G, S> {
                 cache,
                 storage: self.urls,
             },
-            slugs: self.slugs,
+            codes: self.codes,
         }
     }
 }

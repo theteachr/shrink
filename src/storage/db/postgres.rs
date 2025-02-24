@@ -6,7 +6,7 @@ use r2d2_postgres::{
 use tokio::task::block_in_place;
 use url::Url;
 
-use crate::{error, Slug, Storage};
+use crate::{error, Code, Storage};
 
 pub struct Postgres(Pool<PostgresConnectionManager<NoTls>>);
 
@@ -34,21 +34,21 @@ impl Postgres {
 }
 
 impl Storage for Postgres {
-    fn store(&mut self, url: Url, slug: &Slug) -> Result<(), error::Storage> {
+    fn store(&mut self, url: Url, code: &Code) -> Result<(), error::Storage> {
         block_in_place(move || {
             self.0
                 .get()
                 .map_err(|e| error::Storage::Internal(e.to_string()))?
                 .execute(
                     include_str!("scripts/postgres/insert.sql"),
-                    &[&slug.as_str(), &url.to_string()],
+                    &[&code.as_str(), &url.to_string()],
                 )?;
 
             Ok(())
         })
     }
 
-    fn load(&self, slug: &Slug) -> Result<Url, error::Load> {
+    fn load(&self, code: &Code) -> Result<Url, error::Load> {
         block_in_place(move || {
             let mut conn = self
                 .0
@@ -57,7 +57,7 @@ impl Storage for Postgres {
 
             conn.query(
                 include_str!("scripts/postgres/select.sql"),
-                &[&slug.as_str()],
+                &[&code.as_str()],
             )
             .map_err(|e| error::Load::Internal(e.to_string()))?
             .iter()
