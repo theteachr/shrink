@@ -5,12 +5,13 @@ use crate::{
     error,
     generators::{Counter, RB62},
     storage::{Cache, Cached, Memory, Postgres, Sqlite},
+    validator::Code,
     Generator, Shrinker, Storage,
 };
 use url::Url;
 
 pub struct App<G, S> {
-    urls: S,
+    pub urls: S,
     codes: G,
 }
 
@@ -53,7 +54,7 @@ impl App<RB62, Postgres> {
 }
 
 impl<G: Generator, S: Storage> Shrinker for App<G, S> {
-    fn shrink(&mut self, url: Url) -> Result<String, error::Internal> {
+    fn shrink(&mut self, url: Url) -> Result<Code, error::Internal> {
         let mut code = self.codes.generate(&url);
         // In case there is a collision, generate a new code until it's unique.
         while let Ok(_) = self.urls.load(&code) {
@@ -63,12 +64,8 @@ impl<G: Generator, S: Storage> Shrinker for App<G, S> {
         Ok(code)
     }
 
-    fn expand(&self, code: &str) -> Result<Url, error::Load> {
+    fn expand(&self, code: &Code) -> Result<Url, error::Load> {
         self.urls.load(code)
-    }
-
-    fn store_custom(&mut self, url: Url, code: &str) -> Result<(), error::Storage> {
-        self.urls.store(url, code)
     }
 }
 

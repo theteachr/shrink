@@ -9,7 +9,6 @@ impl Default for Config {
     fn default() -> Self {
         let port = 3000;
         let mut base: Url = "http://localhost".parse().unwrap();
-
         let _ = base.set_port(Some(port));
 
         Self {
