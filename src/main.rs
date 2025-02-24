@@ -1,3 +1,6 @@
+mod config;
+
+use config::Config;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -82,12 +85,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::open("data/urls.db")?.with_cache(redis_client);
     let app = Arc::new(RwLock::new(app));
 
-    let server_url = std::env::var("SERVER_URL").unwrap_or("http://localhost:3000".to_owned());
-    let port = std::env::var("PORT").unwrap_or("3000".to_owned());
+    let config = Config::from_env().unwrap_or_default();
 
     let app = AppState {
         app,
-        base_url: server_url.parse()?,
+        base_url: config.server_url,
     };
 
     let router = Router::new()
@@ -97,7 +99,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Add a tracing layer.
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    let listener =
+        tokio::net::TcpListener::bind(format!("0.0.0.0:{port}", port = config.port)).await?;
 
     // More issues with sync postgres client being dependent on tokio.
     // Couldn't gracefully shutdonwn.
