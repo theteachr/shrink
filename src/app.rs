@@ -1,6 +1,8 @@
-use std::error::Error;
 use std::io::BufRead;
+use std::{error::Error, sync::Arc};
 
+use crate::storage::Redis;
+use crate::validator::{Alnum, Validator};
 use crate::{
     error,
     generators::{Counter, RB62},
@@ -8,6 +10,7 @@ use crate::{
     validator::Code,
     Generator, Shrinker, Storage,
 };
+use tokio::sync::RwLock;
 use url::Url;
 
 pub struct App<G, S> {
@@ -78,5 +81,18 @@ impl<S: Storage, G> App<G, S> {
             },
             codes: self.codes,
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub app: Arc<RwLock<App<RB62, Cached<Redis, Sqlite>>>>,
+    pub base_url: Url,
+    pub validator: Arc<Validator<Alnum>>,
+}
+
+impl AppState {
+    pub fn shrink_response(&self, code: &Code) -> Option<Url> {
+        self.base_url.join(code.as_str()).ok()
     }
 }

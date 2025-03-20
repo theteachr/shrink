@@ -17,6 +17,7 @@ impl Redis {
         self.pool
             .get()?
             .set_ex::<_, _, ()>(key, value, self.expire.as_secs())?;
+
         Ok(())
     }
 

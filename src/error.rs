@@ -10,7 +10,7 @@ pub struct Duplicate;
 #[derive(Debug)]
 pub struct NotFound;
 #[derive(Debug)]
-pub struct Internal(String);
+pub struct Internal(pub String);
 #[derive(Debug)]
 pub struct BadAlias;
 
