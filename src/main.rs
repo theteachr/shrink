@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let router = Router::new()
-        .route("/", post(route::shrink).put(route::custom_code))
+        .route("/", post(route::shrink).put(route::custom_code).get(route::index))
         .route("/{code}", get(route::redirect))
         .with_state(app);
 

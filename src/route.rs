@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    response::Redirect,
+    response::{Html, IntoResponse, Redirect},
     Json,
 };
 use shrink::{app::AppState, error, Shrinker, Storage};
@@ -71,4 +71,8 @@ pub async fn custom_code(
         .shrink_response(&code)
         .ok_or(error::Storage::Internal("Failed to generate a code.".into()))
         .map(|url| Json(ShrinkResponse { shrunk: url }))
+}
+
+pub async fn index() -> impl IntoResponse {
+    Html(include_str!("page/index.html"))
 }
