@@ -40,7 +40,7 @@ impl App<RB62, Sqlite> {
     pub fn open(path: &str) -> Result<App<RB62, Sqlite>, Box<dyn Error>> {
         Ok(Self {
             urls: Sqlite::open(path)?,
-            codes: RB62::default(),
+            codes: RB62,
         })
     }
 }
@@ -51,7 +51,7 @@ impl App<RB62, Postgres> {
 
         Self {
             urls: Postgres::connect(config).await.unwrap(),
-            codes: RB62::default(),
+            codes: RB62,
         }
     }
 }
@@ -60,7 +60,7 @@ impl<G: Generator, S: Storage> Shrinker for App<G, S> {
     fn shrink(&mut self, url: Url) -> Result<Code, error::Internal> {
         let mut code = self.codes.generate(&url);
         // In case there is a collision, generate a new code until it's unique.
-        while let Ok(_) = self.urls.load(&code) {
+        while self.urls.load(&code).is_ok() {
             code = self.codes.generate(&url);
         }
         self.urls.store(url, &code)?;

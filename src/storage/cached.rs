@@ -21,7 +21,7 @@ impl<C: Cache, S: Storage> Storage for Cached<C, S> {
         self.cache.load(code).or_else(|_| {
             let url = self.storage.load(code)?;
 
-            if let Err(_) = self.cache.set(&url, code) {
+            if self.cache.set(&url, code).is_err() {
                 eprintln!("Failed to store URL in cache");
             }
 

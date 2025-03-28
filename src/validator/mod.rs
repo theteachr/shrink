@@ -20,6 +20,6 @@ impl<T: Validate> Validator<T> {
 
 impl<T: Validate> Validator<T> {
     pub fn validate(&self, s: String) -> Option<Code> {
-        self.0.validate(&s).then(|| Code(s))
+        self.0.validate(&s).then_some(Code(s))
     }
 }

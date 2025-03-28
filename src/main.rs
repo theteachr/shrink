@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = AppState {
         app,
         base_url: config.server_url,
-        validator: Arc::new(Validator::new(Alnum::default())),
+        validator: Arc::new(Validator::new(Alnum)),
     };
 
     let router = Router::new()
