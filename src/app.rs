@@ -59,11 +59,19 @@ impl App<RB62, Postgres> {
 impl<G: Generator, S: Storage> Shrinker for App<G, S> {
     fn shrink(&mut self, url: Url) -> Result<Code, error::Internal> {
         let mut code = self.codes.generate(&url);
-        // In case there is a collision, generate a new code until it's unique.
+
+        // In case there is a collision, we will be able to load a value using
+        // the newly generated code. Generate a new code until it's unique.
+        //
+        // But this check will be vain if we have a `Generator` that guarantees
+        // unique values. Try EAFP by generating new code if storage has a
+        // failure?
         while self.urls.load(&code).is_ok() {
             code = self.codes.generate(&url);
         }
+
         self.urls.store(url, &code)?;
+
         Ok(code)
     }
 
